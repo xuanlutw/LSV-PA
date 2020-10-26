@@ -18,8 +18,9 @@ struct PackageRegistrationManager {
 } lsvPackageRegistrationManager;
 
 int cmp(const void *a, const void *b) {
-      Abc_Obj_t* obj_a = (Abc_Obj_t*)a;
-      Abc_Obj_t* obj_b = (Abc_Obj_t*)b;
+      Abc_Obj_t* obj_a = *(Abc_Obj_t**)a;
+      Abc_Obj_t* obj_b = *(Abc_Obj_t**)b;
+      //printf("%d %d\n", Abc_ObjId(obj_a), Abc_ObjId(obj_b));
       if (Abc_ObjId(obj_a) < Abc_ObjId(obj_b))
           return -1;
       else if (Abc_ObjId(obj_a) == Abc_ObjId(obj_b)) 
