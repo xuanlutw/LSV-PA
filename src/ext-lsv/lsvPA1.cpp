@@ -52,6 +52,10 @@ void Lsv_NtkPrintUnate(Abc_Ntk_t* pNtk) {
             Abc_Obj_t* neg_unate[num_fanin];
             Abc_Obj_t* binate[num_fanin];
 
+            // Ignore constant
+            if (!num_fanin)
+                continue;
+
             Abc_ObjForEachFanin(pObj, pFanin, j) {
                 int pos_count = 0;
                 int neg_count = 0;
