@@ -20,6 +20,7 @@ grade_one_branch () {
     student="$1"
     result="${pa_dir}/${student}.csv"
     git switch "${student}"
+    rm src/ext-lsv/*.o src/ext-lsv/*.d
     make -j8
     echo "Benchmark,Result" > "${result}"
     rm -rf "${ref_dir}" "${out_dir}" "${diff_dir}"
