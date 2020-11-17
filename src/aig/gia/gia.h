@@ -235,6 +235,7 @@ struct Gia_Man_t_
     Vec_Wrd_t *    vSuppWords;    // support information
     Vec_Int_t      vCopiesTwo;    // intermediate copies
     Vec_Int_t      vSuppVars;     // used variables
+    Vec_Int_t      vVarMap;       // used variables
     Gia_Dat_t *    pUData;
 };
 
@@ -1402,6 +1403,7 @@ extern void                Gia_ManFanoutStart( Gia_Man_t * p );
 extern void                Gia_ManFanoutStop( Gia_Man_t * p );
 extern void                Gia_ManStaticFanoutStart( Gia_Man_t * p );
 extern void                Gia_ManStaticFanoutStop( Gia_Man_t * p );
+extern void                Gia_ManStaticMappingFanoutStart( Gia_Man_t * p );
 /*=== giaForce.c =========================================================*/
 extern void                For_ManExperiment( Gia_Man_t * pGia, int nIters, int fClustered, int fVerbose );
 /*=== giaFrames.c =========================================================*/
@@ -1692,6 +1694,7 @@ extern int                 Gia_ObjRecognizeMuxLits( Gia_Man_t * p, Gia_Obj_t * p
 extern int                 Gia_NodeMffcSize( Gia_Man_t * p, Gia_Obj_t * pNode );
 extern int                 Gia_NodeMffcSizeMark( Gia_Man_t * p, Gia_Obj_t * pNode );
 extern int                 Gia_NodeMffcSizeSupp( Gia_Man_t * p, Gia_Obj_t * pNode, Vec_Int_t * vSupp );
+extern int                 Gia_NodeMffcMapping( Gia_Man_t * p );
 extern int                 Gia_ManHasDangling( Gia_Man_t * p );
 extern int                 Gia_ManMarkDangling( Gia_Man_t * p );
 extern Vec_Int_t *         Gia_ManGetDangling( Gia_Man_t * p );

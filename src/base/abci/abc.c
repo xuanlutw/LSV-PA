@@ -36287,18 +36287,34 @@ int Abc_CommandAbc9Fraig( Abc_Frame_t * pAbc, int argc, char ** argv )
     extern Gia_Man_t * Cec2_ManSimulateTest( Gia_Man_t * p, Cec_ParFra_t * pPars );
     extern Gia_Man_t * Cec3_ManSimulateTest( Gia_Man_t * p, Cec_ParFra_t * pPars );
     extern Gia_Man_t * Cec4_ManSimulateTest( Gia_Man_t * p, Cec_ParFra_t * pPars );
-    Cec_ParFra_t ParsFra, * pPars = &ParsFra;
-    Gia_Man_t * pTemp;
+    Cec_ParFra_t ParsFra, * pPars = &ParsFra; Gia_Man_t * pTemp;
     int c, fUseAlgo = 0, fUseAlgoG = 0, fUseAlgoG2 = 0;
     Cec_ManFraSetDefaultParams( pPars );
-    pPars->fSatSweeping = 1;
-    pPars->nItersMax = 1000000;
-    pPars->nBTLimit  = 1000000;
+    pPars->jType          =       2;    // solver type
+    pPars->fSatSweeping   =       1;    // conflict limit at a node
+    pPars->nWords         =       4;    // simulation words
+    pPars->nRounds        =      10;    // simulation rounds
+    pPars->nItersMax      =    2000;    // this is a miter
+    pPars->nBTLimit       = 1000000;    // use logic cones
+    pPars->nSatVarMax     =    1000;    // the max number of SAT variables before recycling SAT solver
+    pPars->nCallsRecycle  =     500;    // calls to perform before recycling SAT solver
+    pPars->nGenIters      =     100;    // pattern generation iterations
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "WRILDCrmdckngxwvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "JWRILDCNPrmdckngxwvh" ) ) != EOF )
     {
         switch ( c )
         {
+        case 'J':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            pPars->jType = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( pPars->jType < 0 )
+                goto usage;
+            break;
         case 'W':
             if ( globalUtilOptind >= argc )
             {
@@ -36365,6 +36381,28 @@ int Abc_CommandAbc9Fraig( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( pPars->nBTLimit < 0 )
                 goto usage;
             break;
+        case 'N':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            pPars->nCallsRecycle = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( pPars->nCallsRecycle < 0 )
+                goto usage;
+            break;
+        case 'P':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-P\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            pPars->nGenIters = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( pPars->nGenIters < 0 )
+                goto usage;
+            break;
         case 'r':
             pPars->fRewriting ^= 1;
             break;
@@ -36416,14 +36454,17 @@ int Abc_CommandAbc9Fraig( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
 
 usage:
-    Abc_Print( -2, "usage: &fraig [-WRILDC <num>] [-rmdckngwvh]\n" );
+    Abc_Print( -2, "usage: &fraig [-JWRILDCNP <num>] [-rmdckngwvh]\n" );
     Abc_Print( -2, "\t         performs combinational SAT sweeping\n" );
+    Abc_Print( -2, "\t-J num : the solver type [default = %d]\n", pPars->jType );
     Abc_Print( -2, "\t-W num : the number of simulation words [default = %d]\n", pPars->nWords );
     Abc_Print( -2, "\t-R num : the number of simulation rounds [default = %d]\n", pPars->nRounds );
     Abc_Print( -2, "\t-I num : the number of sweeping iterations [default = %d]\n", pPars->nItersMax );
     Abc_Print( -2, "\t-L num : the max number of levels of nodes to consider [default = %d]\n", pPars->nLevelMax );
     Abc_Print( -2, "\t-D num : the max number of steps of speculative reduction [default = %d]\n", pPars->nDepthMax );
     Abc_Print( -2, "\t-C num : the max number of conflicts at a node [default = %d]\n", pPars->nBTLimit );
+    Abc_Print( -2, "\t-N num : the min number of calls to recycle the solver [default = %d]\n", pPars->nCallsRecycle );
+    Abc_Print( -2, "\t-P num : the number of pattern generation iterations [default = %d]\n", pPars->nGenIters );
     Abc_Print( -2, "\t-r     : toggle the use of AIG rewriting [default = %s]\n", pPars->fRewriting? "yes": "no" );
     Abc_Print( -2, "\t-m     : toggle miter vs. any circuit [default = %s]\n", pPars->fCheckMiter? "miter": "circuit" );
     Abc_Print( -2, "\t-d     : toggle using double output miters [default = %s]\n", pPars->fDualOut? "yes": "no" );

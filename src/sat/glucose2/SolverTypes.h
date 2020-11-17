@@ -32,15 +32,17 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include <assert.h>
 
-#include "sat/glucose/IntTypes.h"
-#include "sat/glucose/Alg.h"
-#include "sat/glucose/Vec.h"
-#include "sat/glucose/Map.h"
-#include "sat/glucose/Alloc.h"
+#include "sat/glucose2/IntTypes.h"
+#include "sat/glucose2/Alg.h"
+#include "sat/glucose2/Vec.h"
+#include "sat/glucose2/Map.h"
+#include "sat/glucose2/Alloc.h"
+
+#include "sat/glucose2/CGlucose.h"
 
 ABC_NAMESPACE_CXX_HEADER_START
 
-namespace Gluco {
+namespace Gluco2 {
 
 //=================================================================================================
 // Variables, literals, lifted booleans, clauses:
@@ -90,9 +92,9 @@ const Lit lit_Error = { -1 };  // }
 //       does enough constant propagation to produce sensible code, and this appears to be somewhat
 //       fragile unfortunately.
 
-#define l_True  (Gluco::lbool((uint8_t)0)) // gcc does not do constant propagation if these are real constants.
-#define l_False (Gluco::lbool((uint8_t)1))
-#define l_Undef (Gluco::lbool((uint8_t)2))
+#define l_True  (Gluco2::lbool((uint8_t)0)) // gcc does not do constant propagation if these are real constants.
+#define l_False (Gluco2::lbool((uint8_t)1))
+#define l_Undef (Gluco2::lbool((uint8_t)2))
 
 class lbool {
     uint8_t value;
@@ -144,6 +146,10 @@ class Clause {
     union { Lit lit; float act; uint32_t abs; CRef rel; } data[0];
 
     friend class ClauseAllocator;
+
+    #ifdef CGLUCOSE_EXP
+    friend class Solver;
+    #endif
 
     // NOTE: This constructor cannot be used directly (doesn't allocate enough memory).
     template<class V>

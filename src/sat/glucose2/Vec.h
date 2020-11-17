@@ -24,12 +24,12 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <assert.h>
 #include <new>
 
-#include "sat/glucose/IntTypes.h"
-#include "sat/glucose/XAlloc.h"
+#include "sat/glucose2/IntTypes.h"
+#include "sat/glucose2/XAlloc.h"
 
 ABC_NAMESPACE_CXX_HEADER_START
 
-namespace Gluco {
+namespace Gluco2 {
 
 //=================================================================================================
 // Automatically resizable arrays
