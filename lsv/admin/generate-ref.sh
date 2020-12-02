@@ -26,7 +26,7 @@ mkdir -p "${ref_dir}"
 for bench in "${bench_list[@]}"; do
     echo "[INFO] Generating a reference output for ${bench} ..."
     bch_name=$(echo "${bench}" | awk -F "/" '{print $(NF)}' | sed -e 's/.aig$//')
-    timeout "${time_limit}" abc -c "${ref_cmd}" "${bench}" > "${ref_dir}/${bch_name}.txt"
+    timeout "${time_limit}" ./abc -c "${ref_cmd}" "${bench}" > "${ref_dir}/${bch_name}.txt"
     if [ "$?" -ne 0 ]; then
         echo "  [ERROR] Timeout!"
     fi
