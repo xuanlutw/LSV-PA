@@ -3,6 +3,7 @@
 #include "base/main/mainInt.h"
 #include "sat/cnf/cnf.h"
 #include <cstdlib>
+//#define LSVDBG1
 
 static int Lsv_CommandPrintPOUnate(Abc_Frame_t* pAbc, int argc, char** argv);
 
@@ -36,101 +37,145 @@ extern "C" Abc_Ntk_t * Abc_NtkCreateCone( Abc_Ntk_t * pNtk, Abc_Obj_t * pNode, c
 void Lsv_NtkPrintPOUnate(Abc_Ntk_t* pNtk) {
     Aig_Obj_t* pAigObj;
     Abc_Obj_t* pPO;
+    Abc_Obj_t* pPOs;
     Abc_Obj_t* pPI;
-    Abc_Obj_t* pNode;
-    Abc_Obj_t* pFanin;
-    int i, j, k;
-
-    // Assert AIG
-    assert(Abc_NtkIsStrash(pNtk));
-    assert(Abc_NtkLatchNum(pNtk) == 0);
-
-    // Convert to AIG
-    Aig_Man_t* pMan = Abc_NtkToDar(pNtk, 0, 0);
-
-    // Convert to CNF
-    //printf("%d\n", Aig_ManCoNum(pMan));
-    Cnf_Dat_t* lCnf = Cnf_Derive(pMan, Aig_ManCoNum(pMan));
-    Cnf_Dat_t* rCnf = Cnf_DataDup(lCnf);
-    Cnf_DataLift(rCnf, rCnf->nVars);
-    
-    //Cnf_DataPrint(lCnf, 1);
-    //Cnf_DataPrint(rCnf, 1);
-    
-    // Creat solver
-    sat_solver* pSat = (sat_solver *)Cnf_DataWriteIntoSolver(lCnf, 1, 0);
-    Cnf_DataWriteIntoSolverInt(pSat, rCnf, 1, 0);
-    lit assumptions[4 + Abc_NtkPiNum(pNtk)];
-
-    Abc_NtkForEachPi(pNtk, pPI, i) {
-        int aig_id = Abc_ObjId(pPI);
-        //printf("%d %d %d %d %d\n", i, Abc_ObjId(pPI), aig_id, lCnf->pVarNums[aig_id], rCnf->pVarNums[aig_id]);
-        sat_solver_add_buffer_enable(pSat, lCnf->pVarNums[aig_id], rCnf->pVarNums[aig_id], lCnf->nVars * 2 + i, 0);
-        assumptions[4 + i] = Abc_Var2Lit(lCnf->nVars * 2 + i, 0); // Positive
-    }
-
-    //printf("        nVars\tnClauses\n");
-    //printf("lCNF:   %d\t%d\n", lCnf->nVars, lCnf->nClauses);
-    //printf("rCNF:   %d\t%d\n", rCnf->nVars, rCnf->nClauses);
-    //printf("SOLVER: %d\t%d\n", sat_solver_nvars(pSat), sat_solver_nclauses(pSat));
-    //printf("\n");
-    //Abc_Obj_t* rrr;
-    //Aig_Obj_t* sss;
-    //Abc_NtkForEachObj(pNtk, rrr, i) {
-        //printf("Object Id = %d, name = %s\n", Abc_ObjId(rrr), Abc_ObjName(rrr));
-    //}
-    //printf("%d^^==========vv%d\n", Abc_NtkNodeNum(pNtk), Aig_ManNodeNum(pMan));
-    //Aig_ManForEachObj(pMan, sss, i) {
-        //printf("Object Id = %d\n", Aig_ObjId(sss));
-    //}
-    //printf("=====\n");
-    //Aig_ManForEachPoSeq(pMan, sss, i) {
-        //printf("Object Id = %d\n", Aig_ObjId(sss));
-    //}
-    //printf("=====\n");
-    //Aig_ManForEachPiSeq(pMan, sss, i) {
-        //printf("Object Id = %d\n", Aig_ObjId(sss));
-    //}
-    int is_pu, is_nu;
+    Abc_Obj_t* pPIs;
+    int aig_id;
+    int i;
+    int j;
+    int k;
+    int num_pi = Abc_NtkPiNum(pNtk);
+    int p_status[num_pi + 10];
+    int n_status[num_pi + 10];
     int num_punate;
     int num_nunate;
     int num_binate;
     Abc_Obj_t* punate[Abc_NtkPiNum(pNtk)];
     Abc_Obj_t* nunate[Abc_NtkPiNum(pNtk)];
     Abc_Obj_t* binate[Abc_NtkPiNum(pNtk)];
+    int num_spi;
+    //int is_spi[num_pi + 10];
+    int num_assum = num_pi + 4;
+    lit assum[num_assum];
+    int assum_base;
+
+    // Assert AIG
+    assert(Abc_NtkIsStrash(pNtk));
+    assert(Abc_NtkLatchNum(pNtk) == 0);
+
 
     // For Each PO
     Abc_NtkForEachPo(pNtk, pPO, i) {
-        //printf("Object Id = %d, name = %s\n", Abc_ObjId(pPO), Abc_ObjName(pPO));
-        int aig_id = Abc_ObjId(pPO) + Abc_NtkNodeNum(pNtk);
+    // Convert to AIG
+    Abc_Ntk_t* pNtks = Abc_NtkCreateCone(pNtk, Abc_ObjFanin0(pPO), Abc_ObjName(pPO), 0);
+    num_spi = Abc_NtkPiNum(pNtks);
+    num_assum = num_spi + 4;
+    Aig_Man_t* pMan = Abc_NtkToDar(pNtks, 0, 0);
 
-        assumptions[0] = Abc_Var2Lit(lCnf->pVarNums[aig_id], 0); // Positive
-        assumptions[1] = Abc_Var2Lit(rCnf->pVarNums[aig_id], 1); // Negative
+    // Convert to CNF
+    Cnf_Dat_t* lCnf = Cnf_Derive(pMan, Aig_ManCoNum(pMan));
+    Cnf_Dat_t* rCnf = Cnf_DataDup(lCnf);
+    Cnf_DataLift(rCnf, rCnf->nVars);
+    assum_base = lCnf->nVars * 2;
+#ifdef LSVDBG1
+    Cnf_DataPrint(lCnf, 1);
+    Cnf_DataPrint(rCnf, 1);
+#endif
+    
+    // Creat solver
+    sat_solver* pSat = (sat_solver *)Cnf_DataWriteIntoSolver(lCnf, 1, 0);
+    Cnf_DataWriteIntoSolverInt(pSat, rCnf, 1, 0);
+
+    //Abc_NtkForEachPi(pNtk, pPI, j) {
+        //is_spi[Abc_ObjId(pPI)] = 0;
+    //}
+    Abc_NtkForEachPi(pNtks, pPI, j) {
+        //is_spi[Abc_ObjId(pPI)] = 1;
+        sat_solver_add_buffer_enable(pSat,  \
+            lCnf->pVarNums[Abc_ObjId(pPI)], \
+            rCnf->pVarNums[Abc_ObjId(pPI)], \
+            assum_base + j, 0);
+        assum[4 + j] = Abc_Var2Lit(assum_base + j, 0); // Positive
+    }
+#ifdef LSVDBG2
+    printf("        nVars\tnClauses\n");
+    printf("lCNF:   %d\t%d\n", lCnf->nVars, lCnf->nClauses);
+    printf("rCNF:   %d\t%d\n", rCnf->nVars, rCnf->nClauses);
+    printf("SOLVER: %d\t%d\n", sat_solver_nvars(pSat), sat_solver_nclauses(pSat));
+    printf("\n");
+    Abc_Obj_t* rrr;
+    Aig_Obj_t* sss;
+    Abc_NtkForEachObj(pNtk, rrr, j) {
+        printf("Object Id = %d, name = %s\n", Abc_ObjId(rrr), Abc_ObjName(rrr));
+    }
+    printf("%d^^==========vv%d\n", Abc_NtkNodeNum(pNtk), Aig_ManNodeNum(pMan));
+    Aig_ManForEachObj(pMan, sss, j) {
+        printf("Object Id = %d\n", Aig_ObjId(sss));
+    }
+    printf("=====\n");
+    Aig_ManForEachPoSeq(pMan, sss, j) {
+        printf("Object Id = %d\n", Aig_ObjId(sss));
+    }
+    printf("=====\n");
+    Aig_ManForEachPiSeq(pMan, sss, j) {
+        printf("Object Id = %d\n", Aig_ObjId(sss));
+    }
+#endif
+
+        Aig_ManForEachPoSeq(pMan, pAigObj, j) {
+            aig_id = Aig_ObjId(pAigObj);
+        }
+        //aig_id = Abc_ObjId(pPO) + Abc_NtkNodeNum(pNtks);
+
+        Abc_NtkForEachPo(pNtks, pPOs, j) {
+            if (Abc_ObjFaninC0(pPO) == Abc_ObjFaninC0(pPOs)) {
+                assum[0] = Abc_Var2Lit(lCnf->pVarNums[aig_id], 0); // Positive
+                assum[1] = Abc_Var2Lit(rCnf->pVarNums[aig_id], 1); // Negative
+            }
+            else {
+                assum[0] = Abc_Var2Lit(lCnf->pVarNums[aig_id], 1); // Positive
+                assum[1] = Abc_Var2Lit(rCnf->pVarNums[aig_id], 0); // Negative
+            }
+        }
         num_punate = 0;
         num_nunate = 0;
         num_binate = 0;
 
-        Abc_NtkForEachPi(pNtk, pPI, j) {
-            assumptions[4 + j] = Abc_Var2Lit(lCnf->nVars * 2 + j, 1); // Negative
+        Abc_NtkForEachPi(pNtks, pPI, j) {
+            //printf("||]]%d\n", j);
+            assum[4 + j] = Abc_Var2Lit(assum_base + j, 1); // Negative
             // TEST positive unate
-            assumptions[2] = Abc_Var2Lit(lCnf->pVarNums[Abc_ObjId(pPI)], 1);
-            assumptions[3] = Abc_Var2Lit(rCnf->pVarNums[Abc_ObjId(pPI)], 0);
-            is_pu = sat_solver_solve(pSat, assumptions, assumptions + 4 + Abc_NtkPiNum(pNtk), \
+            assum[2] = Abc_Var2Lit(lCnf->pVarNums[Abc_ObjId(pPI)], 1);
+            assum[3] = Abc_Var2Lit(rCnf->pVarNums[Abc_ObjId(pPI)], 0);
+            p_status[j] = sat_solver_solve(pSat, assum, assum + num_assum, \
                     (ABC_INT64_T)0, (ABC_INT64_T)0, (ABC_INT64_T)0, (ABC_INT64_T)0);
             // TEST negative unate
-            assumptions[2] = Abc_Var2Lit(lCnf->pVarNums[Abc_ObjId(pPI)], 0);
-            assumptions[3] = Abc_Var2Lit(rCnf->pVarNums[Abc_ObjId(pPI)], 1);
-            is_nu = sat_solver_solve(pSat, assumptions, assumptions + 4 + Abc_NtkPiNum(pNtk), \
+            assum[2] = Abc_Var2Lit(lCnf->pVarNums[Abc_ObjId(pPI)], 0);
+            assum[3] = Abc_Var2Lit(rCnf->pVarNums[Abc_ObjId(pPI)], 1);
+            n_status[j] = sat_solver_solve(pSat, assum, assum + num_assum, \
                     (ABC_INT64_T)0, (ABC_INT64_T)0, (ABC_INT64_T)0, (ABC_INT64_T)0);
-            assumptions[4 + j] = Abc_Var2Lit(lCnf->nVars * 2 + j, 0); // Positive
-
-            if (is_pu == -1)
+            assum[4 + j] = Abc_Var2Lit(assum_base + j, 0); // Positive
+        }
+        Abc_NtkForEachPi(pNtk, pPI, j) {
+            int fl = 1;
+            Abc_NtkForEachPi(pNtks, pPIs, k) {
+                if (strcmp(Abc_ObjName(pPI), Abc_ObjName(pPIs)) == 0) {
+                    fl = 0;
+                    break;
+                }
+            }
+            if (fl) {
                 punate[num_punate++] = pPI;
-            if (is_nu == -1)
                 nunate[num_nunate++] = pPI;
-            if (is_pu != -1 && is_nu != -1)
-                binate[num_binate++] = pPI;
-            //printf("%d %d\n", is_pu, is_nu);
+            }
+            else {
+                if (p_status[k] == l_False)
+                    punate[num_punate++] = pPI;
+                if (n_status[k] == l_False)
+                    nunate[num_nunate++] = pPI;
+                if (p_status[k] != l_False && n_status[k] != l_False)
+                    binate[num_binate++] = pPI;
+            }
         }
         qsort((void*)punate, num_punate, sizeof(Abc_Obj_t*), cmp);
         qsort((void*)nunate, num_nunate, sizeof(Abc_Obj_t*), cmp);
@@ -154,9 +199,7 @@ void Lsv_NtkPrintPOUnate(Abc_Ntk_t* pNtk) {
                 printf(",%s", Abc_ObjName(binate[j]));
             printf("\n");
         }
-        //exit(-1);
-        //printf( "CNF stats: Vars = %6d. Clauses = %7d. Literals = %8d. \n",\
-                //pCnf->nVars, pCnf->nClauses, pCnf->nLiterals );
+        sat_solver_delete(pSat);
     }
 
     //// For Each PO
